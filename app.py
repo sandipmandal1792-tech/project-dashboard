@@ -251,6 +251,14 @@ if "phase_data" not in st.session_state:
 
         for sheet, df in all_sheets.items():
 
+            if "Task_Type" not in df.columns:
+
+                df["Task_Type"] = "Main Task"
+
+            if "Parent_Task" not in df.columns:
+
+                df["Parent_Task"] = ""
+
             if "Task_ID" not in df.columns:
 
                 df.insert(
@@ -263,29 +271,12 @@ if "phase_data" not in st.session_state:
 
     else:
 
-        sample_df = pd.DataFrame([
-
-            {
-                "Task_ID": 1,
-                "Task": "Requirement Gathering",
-                "Status": "In Progress",
-                "Priority": "High",
-                "Assignee": "Rahul",
-                "Planned Start Date": "2026-01-01",
-                "Planned End Date": "2026-01-15",
-                "Actual End Date": "",
-                "Progress": 50
-            }
-
-        ])
-
-        st.session_state.phase_data[
-            "Requirement Analysis"
-        ] = sample_df
+        st.session_state.phase_data = {}
 
 # =========================================================
 # SAVE FUNCTION
 # =========================================================
+
 
 def save_excel():
 
@@ -349,20 +340,32 @@ if st.sidebar.button("Create Phase"):
         if new_phase_name not in st.session_state.phase_data:
 
             st.session_state.phase_data[
-                new_phase_name
-            ] = pd.DataFrame(columns=[
+                    new_phase_name
+                ] = pd.DataFrame(columns=[
 
-                "Task_ID",
-                "Task",
-                "Status",
-                "Priority",
-                "Assignee",
-                "Planned Start Date",
-                "Planned End Date",
-                "Actual End Date",
-                "Progress"
+                    "Task_ID",
 
-            ])
+                    "Task_Type",
+
+                    "Parent_Task",
+
+                    "Task",
+
+                    "Status",
+
+                    "Priority",
+
+                    "Assignee",
+
+                    "Planned Start Date",
+
+                    "Planned End Date",
+
+                    "Actual End Date",
+
+                    "Progress"
+
+                ])
 
             save_excel()
 
@@ -382,6 +385,123 @@ Enterprise PMO Dashboard
 </div>
 """, unsafe_allow_html=True)
 
+# =====================================================
+# GLOBAL SUMMARY ROW
+# =====================================================
+
+st.markdown("""
+<div style="
+    color:#93c5fd;
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:8px;
+">
+📌 Select Phase
+</div>
+""", unsafe_allow_html=True)
+
+phase_list = list(
+    st.session_state.phase_data.keys()
+)
+
+summary_phase = None
+
+if len(phase_list) > 0:
+
+    drop_col1, drop_col2 = st.columns([2,5])
+
+with drop_col1:
+
+    summary_phase = st.selectbox(
+        "",
+        phase_list,
+        key="summary_dropdown"
+    )
+
+if summary_phase is not None:
+
+    summary_df = st.session_state.phase_data[
+        summary_phase
+    ]
+
+    if "Task_Type" not in summary_df.columns:
+
+        summary_df["Task_Type"] = "Main Task"
+
+    main_summary_df = summary_df[
+        summary_df["Task_Type"]
+        == "Main Task"
+    ]
+
+    total_tasks = len(main_summary_df)
+
+    completed_tasks = len(
+        main_summary_df[
+            main_summary_df["Status"]
+            == "Done"
+        ]
+    )
+
+    avg_progress = 0
+
+    if total_tasks > 0:
+
+        avg_progress = int(
+            main_summary_df["Progress"]
+            .astype(int)
+            .mean()
+        )
+
+    weeks_elapsed = 0
+
+    try:
+
+        all_start_dates = pd.to_datetime(
+            summary_df["Planned Start Date"],
+            errors="coerce"
+        ).dropna()
+
+        if len(all_start_dates) > 0:
+
+            earliest_date = all_start_dates.min()
+
+            total_days = (
+                pd.Timestamp.today()
+                - earliest_date
+            ).days
+
+            weeks_elapsed = (
+                total_days // 7
+            ) + 1
+
+    except:
+        pass
+
+    sum1, sum2, sum3 = st.columns(3)
+
+    with sum1:
+
+        st.metric(
+            "Phase Progress",
+            f"{avg_progress}%"
+        )
+
+    with sum2:
+
+        st.metric(
+            "Weeks Elapsed",
+            f"{weeks_elapsed}"
+        )
+
+    with sum3:
+
+        st.metric(
+            "Completed Tasks",
+            f"{completed_tasks}/{total_tasks}"
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
 # =========================================================
 # LOOP PHASES
 # =========================================================
@@ -399,6 +519,22 @@ for phase_name in list(
     phase_df = st.session_state.phase_data[
         phase_name
     ]
+
+    # ==========================================
+    # FIX OLD PHASE DATA
+    # ==========================================
+
+    if "Task_Type" not in phase_df.columns:
+
+        phase_df["Task_Type"] = "Main Task"
+
+    if "Parent_Task" not in phase_df.columns:
+
+        phase_df["Parent_Task"] = ""
+
+    st.session_state.phase_data[
+        phase_name
+    ] = phase_df
 
     st.markdown(
         '<div class="phase-card">',
@@ -447,30 +583,493 @@ for phase_name in list(
 
             st.rerun()
 
+        # =====================================================
+    # TABLE VIEW
     # =====================================================
-    # TABLE
-    # =====================================================
 
-    show_df = phase_df.copy()
+    header_cols = st.columns(
+        [1, 5, 2, 2, 2, 2, 2, 2, 1.5]
+    )
 
-    if "Task_ID" in show_df.columns:
+    headers = [
+        "S.No",
+        "Task",
+        "Status",
+        "Priority",
+        "Assignee",
+        "Start",
+        "End",
+        "Actual End",
+        "Progress"
+    ]
 
-        show_df = show_df.drop(
-            columns=["Task_ID"]
+    for col, head in zip(header_cols, headers):
+
+        with col:
+
+            st.markdown(
+                f"""
+                <div style="
+                background:#172554;
+                color:white;
+                padding:12px;
+                border-radius:8px;
+                font-weight:bold;
+                text-align:center;
+                min-height:50px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                ">
+                {head}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown(
+        "<div style='height:10px'></div>",
+        unsafe_allow_html=True
+    )
+
+    main_tasks = phase_df[
+        phase_df["Task_Type"] == "Main Task"
+    ]
+
+    main_serial = 1
+
+    for _, main_row in main_tasks.iterrows():
+
+        # ==========================================
+        # AUTO MAIN TASK PROGRESS
+        # ==========================================
+
+        sub_df_calc = phase_df[
+            phase_df["Parent_Task"]
+            == main_row["Task"]
+        ]
+
+        if len(sub_df_calc) > 0:
+
+            try:
+
+                avg_sub_progress = int(
+                    sub_df_calc["Progress"]
+                    .astype(int)
+                    .mean()
+                )
+
+                phase_df.loc[
+                    phase_df["Task"]
+                    == main_row["Task"],
+                    "Progress"
+                ] = avg_sub_progress
+
+                main_row["Progress"] = avg_sub_progress
+
+                st.session_state.phase_data[
+                    phase_name
+                ] = phase_df
+                # ==========================================
+                # AUTO MAIN TASK ACTUAL END DATE
+                # ==========================================
+
+                try:
+
+                    sub_actual_dates = pd.to_datetime(
+                        sub_df_calc["Actual End Date"],
+                        errors="coerce"
+                    ).dropna()
+
+                    if len(sub_actual_dates) > 0:
+
+                        max_actual_date = (
+                            sub_actual_dates.max()
+                        )
+
+                        phase_df.loc[
+                            phase_df["Task"]
+                            == main_row["Task"],
+                            "Actual End Date"
+                        ] = str(max_actual_date.date())
+
+                        main_row[
+                            "Actual End Date"
+                        ] = str(max_actual_date.date())
+
+                except:
+                    pass
+
+            except:
+                pass
+
+        task_id = main_row["Task_ID"]
+
+        subtasks = phase_df[
+            phase_df["Parent_Task"]
+            == main_row["Task"]
+        ]
+
+        has_subtasks = len(subtasks) > 0
+
+        expand_key = f"expand_{phase_name}_{task_id}"
+
+        if expand_key not in st.session_state:
+
+            st.session_state[expand_key] = False
+
+        row_cols = st.columns(
+            [1, 5, 2, 2, 2, 2, 2, 2, 1.5]
         )
 
-    show_df.insert(
-        0,
-        "S.No",
-        range(1, len(show_df) + 1)
-    )
+        # ============================================
+        # S.NO
+        # ============================================
 
-    st.dataframe(
-        show_df,
-        use_container_width=True,
-        height=250
-    )
+        with row_cols[0]:
 
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                font-size:16px;
+                ">
+                {main_serial}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # TASK
+        # ============================================
+
+        with row_cols[1]:
+
+            if has_subtasks:
+
+                arrow = (
+                    "▼"
+                    if st.session_state[expand_key]
+                    else "▶"
+                )
+
+                if st.button(
+                    f"{arrow} {main_row['Task']}",
+                    key=f"expand_btn_{phase_name}_{task_id}",
+                    use_container_width=True
+                ):
+
+                    st.session_state[
+                        expand_key
+                    ] = not st.session_state[
+                        expand_key
+                    ]
+
+                    st.rerun()
+
+            else:
+
+                st.markdown(
+                    f"""
+                    <div style="
+                    padding-top:10px;
+                    color:white;
+                    ">
+                    {main_row['Task']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # ============================================
+        # STATUS
+        # ============================================
+
+        with row_cols[2]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Status']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # PRIORITY
+        # ============================================
+
+        with row_cols[3]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Priority']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # ASSIGNEE
+        # ============================================
+
+        with row_cols[4]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Assignee']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # START
+        # ============================================
+
+        with row_cols[5]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Planned Start Date']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # END
+        # ============================================
+
+        with row_cols[6]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Planned End Date']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with row_cols[7]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Actual End Date']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # PROGRESS
+        # ============================================
+
+        with row_cols[8]:
+
+            st.markdown(
+                f"""
+                <div style="
+                padding-top:10px;
+                color:white;
+                text-align:center;
+                ">
+                {main_row['Progress']}%
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # ============================================
+        # SUBTASKS
+        # ============================================
+
+        if (
+            has_subtasks
+            and st.session_state[expand_key]
+        ):
+
+            for _, sub_row in subtasks.iterrows():
+
+                sub_cols = st.columns(
+                    [1, 5, 2, 2, 2, 2, 2, 2, 1.5]
+                )
+
+                # BLANK S.NO
+
+                with sub_cols[0]:
+
+                    st.markdown(" ")
+
+                # TASK
+
+                with sub_cols[1]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        padding-left:40px;
+                        color:#bfdbfe;
+                        ">
+                        └── {sub_row['Task']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # STATUS
+
+                with sub_cols[2]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Status']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # PRIORITY
+
+                with sub_cols[3]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Priority']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # ASSIGNEE
+
+                with sub_cols[4]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Assignee']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # START
+
+                with sub_cols[5]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Planned Start Date']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # END
+
+                with sub_cols[6]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Planned End Date']}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # PROGRESS
+
+                with sub_cols[7]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                            {sub_row.get('Actual End Date', '')}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                with sub_cols[8]:
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                        padding-top:10px;
+                        color:#bfdbfe;
+                        text-align:center;
+                        ">
+                        {sub_row['Progress']}%
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+        st.markdown("---")
+
+        main_serial += 1
     # =====================================================
     # EDIT PANEL
     # =====================================================
@@ -518,6 +1117,57 @@ for phase_name in list(
             selected_task_id = selected_row[
                 "Task_ID"
             ]
+
+        # =================================================
+        # TASK TYPE
+        # =================================================
+
+        task_type = st.selectbox(
+            "Task Type",
+            [
+                "Main Task",
+                "Sub Task"
+            ],
+            index=[
+                "Main Task",
+                "Sub Task"
+            ].index(
+                selected_row.get(
+                    "Task_Type",
+                    "Main Task"
+                )
+            )
+        )
+
+        parent_task = ""
+
+        if task_type == "Sub Task":
+
+            main_task_list = list(
+
+                phase_df[
+                    phase_df["Task_Type"]
+                    == "Main Task"
+                ]["Task"]
+
+            )
+
+            if len(main_task_list) > 0:
+
+                parent_task = st.selectbox(
+                    "Parent Main Task",
+                    main_task_list
+                )
+
+            else:
+
+                st.warning(
+                    "Create a Main Task first."
+                )
+
+        # =================================================
+        # TASK DETAILS
+        # =================================================
 
         task_name = st.text_input(
             "Task Name",
@@ -609,31 +1259,36 @@ for phase_name in list(
                 )
             )
 
-        has_actual = st.checkbox(
-            "Has Actual End Date?",
-            value=(
-                str(
-                    selected_row.get(
-                        "Actual End Date",
-                        ""
-                    )
-                ).strip() != ""
-            )
-        )
+       
+        # =====================================================
+        # ACTUAL END DATE
+        # =====================================================
 
         actual_end = ""
 
-        if has_actual:
+        if task_type == "Sub Task":
 
-            actual_end = st.date_input(
-                "Actual End Date",
-                value=pd.to_datetime(
-                    selected_row.get(
-                        "Actual End Date",
-                        str(date.today())
-                    )
-                )
+            has_actual = st.checkbox(
+                "Has Actual End Date?",
+                value=False
             )
+
+            if has_actual:
+
+                actual_end = st.date_input(
+                    "Actual End Date",
+                    value=date.today()
+                )
+
+        else:
+
+            st.info(
+                "Main Task Actual End Date is auto calculated from subtasks"
+            )
+                
+        # =================================================
+        # POSITION
+        # =================================================
 
         position_options = ["Default (Last)"]
 
@@ -648,18 +1303,28 @@ for phase_name in list(
             position_options
         )
 
-        progress = st.slider(
-            "Progress",
-            0,
-            100,
-            int(
-                selected_row.get(
-                    "Progress",
-                    0
-                )
-            )
+        # ==========================================
+        # PROGRESS
+        # ==========================================
+
+        progress = int(
+            selected_row.get("Progress", 0)
         )
 
+        if task_type == "Sub Task":
+
+            progress = st.slider(
+                "Progress",
+                0,
+                100,
+                int(selected_row.get("Progress", 0))
+            )
+
+        else:
+
+            st.info(
+                "Main Task Progress is auto calculated from subtasks"
+            )
         # =================================================
         # BUTTONS
         # =================================================
@@ -691,6 +1356,10 @@ for phase_name in list(
                         else next_task_id
                     ),
 
+                    "Task_Type": task_type,
+
+                    "Parent_Task": parent_task,
+
                     "Task": task_name,
 
                     "Status": status,
@@ -705,7 +1374,7 @@ for phase_name in list(
 
                     "Actual End Date": (
                         str(actual_end)
-                        if has_actual
+                        if actual_end != ""
                         else ""
                     ),
 
@@ -831,6 +1500,10 @@ for phase_name in list(
             unsafe_allow_html=True
         )
 
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
     # =====================================================
     # TIMELINE
     # =====================================================
@@ -839,17 +1512,150 @@ for phase_name in list(
 
     try:
 
-        if len(phase_df) > 0:
+        timeline_df = phase_df[
+            phase_df["Task_Type"]
+            == "Main Task"
+        ]
+
+        if len(timeline_df) > 0:
 
             fig = go.Figure()
 
             task_names = []
             y_positions = []
 
-            total_tasks = len(phase_df)
+            total_tasks = len(timeline_df)
+
+            # =================================================
+            # GLOBAL DATE COLLECTION
+            # =================================================
+
+            global_dates = []
+
+            for _, row in timeline_df.iterrows():
+
+                try:
+
+                    task_name = row["Task"]
+
+                    main_start = pd.to_datetime(
+                        row["Planned Start Date"]
+                    )
+
+                    main_end = pd.to_datetime(
+                        row["Planned End Date"]
+                    )
+
+                    global_dates.append(main_start)
+                    global_dates.append(main_end)
+
+                    subtasks_df = phase_df[
+
+                        (
+                            phase_df["Task_Type"]
+                            == "Sub Task"
+                        )
+
+                        &
+
+                        (
+                            phase_df["Parent_Task"]
+                            == task_name
+                        )
+                    ]
+
+                    if len(subtasks_df) > 0:
+
+                        for _, sub_row in subtasks_df.iterrows():
+
+                            # START
+
+                            try:
+
+                                global_dates.append(
+                                    pd.to_datetime(
+                                        sub_row[
+                                            "Planned Start Date"
+                                        ]
+                                    )
+                                )
+
+                            except:
+                                pass
+
+                            # END
+
+                            try:
+
+                                global_dates.append(
+                                    pd.to_datetime(
+                                        sub_row[
+                                            "Planned End Date"
+                                        ]
+                                    )
+                                )
+
+                            except:
+                                pass
+
+                            # ACTUAL
+
+                            sub_actual = str(
+                                sub_row.get(
+                                    "Actual End Date",
+                                    ""
+                                )
+                            ).strip()
+
+                            if (
+                                sub_actual != ""
+                                and sub_actual.lower() != "nan"
+                            ):
+
+                                try:
+
+                                    global_dates.append(
+                                        pd.to_datetime(
+                                            sub_actual
+                                        )
+                                    )
+
+                                except:
+                                    pass
+
+                except:
+                    pass
+
+            # =================================================
+            # SMART DATE SCALE
+            # =================================================
+
+            min_date = min(global_dates)
+
+            max_date = max(global_dates)
+
+            total_days = max(
+                1,
+                (max_date - min_date).days
+            )
+
+            tick_gap = max(
+                1,
+                total_days // 7
+            )
+
+            tick_dates = pd.date_range(
+                start=min_date,
+                end=max_date,
+                freq=f"{tick_gap}D"
+            )
+
+            # =================================================
+            # TASK LOOP
+            # =================================================
 
             for i, (_, row) in enumerate(
-                phase_df.iterrows()
+                timeline_df.iterrows()
             ):
 
                 task_name = row["Task"]
@@ -860,13 +1666,163 @@ for phase_name in list(
 
                 y_positions.append(y_base)
 
-                planned_start = pd.to_datetime(
+                # =================================================
+                # MAIN TASK DATES
+                # =================================================
+
+                main_start = pd.to_datetime(
                     row["Planned Start Date"]
                 )
 
-                planned_end = pd.to_datetime(
+                main_end = pd.to_datetime(
                     row["Planned End Date"]
                 )
+
+                # =================================================
+                # SUBTASKS
+                # =================================================
+
+                subtasks_df = phase_df[
+
+                    (
+                        phase_df["Task_Type"]
+                        == "Sub Task"
+                    )
+
+                    &
+
+                    (
+                        phase_df["Parent_Task"]
+                        == task_name
+                    )
+                ]
+
+                # =================================================
+                # DATE COLLECTION
+                # =================================================
+
+                all_start_dates = [main_start]
+
+                all_end_dates = [main_end]
+
+                actual_dates = []
+
+                # MAIN ACTUAL
+
+                main_actual = str(
+                    row.get(
+                        "Actual End Date",
+                        ""
+                    )
+                ).strip()
+
+                if (
+                    main_actual != ""
+                    and main_actual.lower() != "nan"
+                ):
+
+                    try:
+
+                        actual_dates.append(
+                            pd.to_datetime(
+                                main_actual
+                            )
+                        )
+
+                    except:
+                        pass
+
+                # =================================================
+                # SUBTASK DATE COLLECTION
+                # =================================================
+
+                if len(subtasks_df) > 0:
+
+                    for _, sub_row in subtasks_df.iterrows():
+
+                        # START
+
+                        try:
+
+                            sub_start = pd.to_datetime(
+                                sub_row[
+                                    "Planned Start Date"
+                                ]
+                            )
+
+                            all_start_dates.append(
+                                sub_start
+                            )
+
+                        except:
+                            pass
+
+                        # END
+
+                        try:
+
+                            sub_end = pd.to_datetime(
+                                sub_row[
+                                    "Planned End Date"
+                                ]
+                            )
+
+                            all_end_dates.append(
+                                sub_end
+                            )
+
+                        except:
+                            pass
+
+                        # ACTUAL
+
+                        sub_actual = str(
+                            sub_row.get(
+                                "Actual End Date",
+                                ""
+                            )
+                        ).strip()
+
+                        if (
+                            sub_actual != ""
+                            and sub_actual.lower() != "nan"
+                        ):
+
+                            try:
+
+                                actual_dates.append(
+                                    pd.to_datetime(
+                                        sub_actual
+                                    )
+                                )
+
+                            except:
+                                pass
+
+                # =================================================
+                # FINAL CALCULATED DATES
+                # =================================================
+
+                planned_start = min(
+                    all_start_dates
+                )
+
+                planned_end = max(
+                    all_end_dates
+                )
+
+                # PREVENT ZERO DAY LINE
+
+                if planned_end <= planned_start:
+
+                    planned_end = (
+                        planned_start
+                        + pd.Timedelta(days=1)
+                    )
+
+                # =================================================
+                # PLANNED LINE
+                # =================================================
 
                 fig.add_trace(
 
@@ -878,32 +1834,49 @@ for phase_name in list(
                         ],
 
                         y=[
-                            y_base + 0.04,
-                            y_base + 0.04
+                            y_base - 0.01,
+                            y_base - 0.01
                         ],
 
                         mode="lines",
 
                         line=dict(
                             color="#facc15",
-                            width=12
+                            width=10
                         ),
 
                         name="Planned",
 
-                        showlegend=(i == 0)
+                        showlegend=(i == 0),
+
+                        hovertemplate=
+                        (
+                            f"<b>{task_name}</b><br>"
+                            f"Planned:<br>"
+                            f"{planned_start.date()}"
+                            f" → "
+                            f"{planned_end.date()}"
+                            "<extra></extra>"
+                        )
                     )
                 )
 
-                actual_end = str(
-                    row["Actual End Date"]
-                ).strip()
+                # =================================================
+                # ACTUAL LINE
+                # =================================================
 
-                if actual_end != "":
+                if len(actual_dates) > 0:
 
-                    actual_end = pd.to_datetime(
-                        actual_end
+                    actual_end = max(
+                        actual_dates
                     )
+
+                    if actual_end <= planned_start:
+
+                        actual_end = (
+                            planned_start
+                            + pd.Timedelta(days=1)
+                        )
 
                     fig.add_trace(
 
@@ -915,41 +1888,55 @@ for phase_name in list(
                             ],
 
                             y=[
-                                y_base - 0.04,
-                                y_base - 0.04
+                                y_base - 0.033,
+                                y_base - 0.033
                             ],
 
                             mode="lines",
 
                             line=dict(
-                                color="#ef4444",
-                                width=12
+                                color="#ff4d4f",
+                                width=10
                             ),
 
                             name="Actual",
 
-                            showlegend=(i == 0)
+                            showlegend=(i == 0),
+
+                            hovertemplate=
+                            (
+                                f"<b>{task_name}</b><br>"
+                                f"Actual:<br>"
+                                f"{planned_start.date()}"
+                                f" → "
+                                f"{actual_end.date()}"
+                                "<extra></extra>"
+                            )
                         )
                     )
+
+            # =================================================
+            # LAYOUT
+            # =================================================
 
             fig.update_layout(
 
                 height=max(
-                    350,
-                    total_tasks * 65
+                    260,
+                    total_tasks * 90
                 ),
 
                 paper_bgcolor="#0f172a",
 
-                plot_bgcolor="#0f172a",
+                plot_bgcolor="#0b1220",
 
                 font=dict(
                     color="white",
-                    size=14
+                    size=13
                 ),
 
                 margin=dict(
-                    l=20,
+                    l=45,
                     r=20,
                     t=20,
                     b=20
@@ -959,20 +1946,41 @@ for phase_name in list(
 
                     orientation="h",
 
-                    yanchor="bottom",
+                    yanchor="top",
 
-                    y=1.02,
+                    y=1.12,
 
                     xanchor="right",
 
-                    x=1
+                    x=0.98,
+
+                    bgcolor="rgba(0,0,0,0)",
+
+                    font=dict(
+                        size=13,
+                        color="#f8fafc"
+                    )
                 ),
 
                 xaxis=dict(
 
                     showgrid=True,
 
-                    gridcolor="rgba(255,255,255,0.08)"
+                    gridcolor=
+                    "rgba(255,255,255,0.08)",
+
+                    tickvals=tick_dates,
+
+                    tickformat="%b %d",
+
+                    zeroline=False,
+
+                    color="#ffffff",
+
+                    tickfont=dict(
+                        color="#ffffff",
+                        size=12
+                    )
                 ),
 
                 yaxis=dict(
@@ -983,33 +1991,46 @@ for phase_name in list(
 
                     ticktext=task_names,
 
-                    showgrid=False
+                    showgrid=False,
+
+                    automargin=True,
+
+                    tickfont=dict(
+                        color="#ffffff",
+                        size=13
+                    ),
+
+                    color="#ffffff",
+
+                    range=[
+                        0.7,
+                        total_tasks + 0.3
+                    ],
+
+                    fixedrange=True
                 )
             )
 
             st.plotly_chart(
                 fig,
-                use_container_width=True
+                use_container_width=True,
+                config={
+                    "displayModeBar": False
+                }
             )
 
-    except:
+    except Exception as e:
 
         st.warning(
-            "Please enter valid dates."
+            f"Timeline Error: {e}"
         )
+    # =========================================================
+    # FOOTER
+    # =========================================================
 
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
+    st.markdown("---")
+
+    st.caption(
+        "Enterprise PMO Dashboard"
     )
-
-# =========================================================
-# FOOTER
-# =========================================================
-
-st.markdown("---")
-
-st.caption(
-    "Enterprise PMO Dashboard"
-)
 
