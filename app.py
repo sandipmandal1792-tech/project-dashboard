@@ -14,7 +14,81 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# =====================================================
+# ADMIN SECURITY
+# =====================================================
 
+ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
+
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "show_login" not in st.session_state:
+    st.session_state.show_login = False
+
+with st.sidebar:
+
+    st.markdown("---")
+
+    if not st.session_state.is_admin:
+
+        if not st.session_state.show_login:
+
+            if st.button(
+                "🔐 Login",
+                use_container_width=True
+            ):
+                st.session_state.show_login = True
+                st.rerun()
+
+        else:
+
+            admin_pass = st.text_input(
+                "Password",
+                type="password"
+            )
+
+            if st.button(
+                "Login",
+                use_container_width=True
+            ):
+
+                if admin_pass == ADMIN_PASSWORD:
+
+                    st.session_state.is_admin = True
+                    st.session_state.show_login = False
+
+                    st.rerun()
+
+                else:
+
+                    st.error("Wrong Password")
+
+    else:
+
+        st.markdown("""
+        <div style="
+        text-align:center;
+        padding:8px 0;
+        margin-bottom:10px;
+        ">
+        <div style="font-size:28px;">👤</div>
+        <div style="color:white;font-weight:600;">
+        Administrator
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button(
+            "🚪 Logout",
+            use_container_width=True
+        ):
+
+            st.session_state.is_admin = False
+            st.session_state.show_login = False
+            
+
+            st.rerun()
+
+    st.markdown("---")
 # =========================================================
 # FILES
 # =========================================================
@@ -301,16 +375,19 @@ st.sidebar.title("⚙️ Project Setup")
 
 new_project_name = st.sidebar.text_input(
     "Project Name",
-    value=project_name
+    value=project_name, 
+    disabled=not st.session_state.is_admin
 )
 
-if st.sidebar.button("Save Project Name"):
+if st.session_state.is_admin:
 
-    with open(PROJECT_FILE, "w") as f:
+    if st.sidebar.button("Save Project Name"):
 
-        f.write(new_project_name)
+        with open(PROJECT_FILE, "w") as f:
 
-    project_name = new_project_name
+            f.write(new_project_name)
+
+        project_name = new_project_name
 
 phase_names = list(
     st.session_state.phase_data.keys()
@@ -326,50 +403,51 @@ st.sidebar.markdown("---")
 # =========================================================
 # CREATE PHASE
 # =========================================================
+if st.session_state.is_admin:
 
-st.sidebar.subheader("➕ Create New Phase")
+    st.sidebar.subheader("➕ Create New Phase")
 
-new_phase_name = st.sidebar.text_input(
-    "Phase Name"
-)
+    new_phase_name = st.sidebar.text_input(
+        "Phase Name"
+    )
 
-if st.sidebar.button("Create Phase"):
+    if st.sidebar.button("Create Phase"):
 
-    if new_phase_name.strip() != "":
+        if new_phase_name.strip() != "":
 
-        if new_phase_name not in st.session_state.phase_data:
+            if new_phase_name not in st.session_state.phase_data:
 
-            st.session_state.phase_data[
-                    new_phase_name
-                ] = pd.DataFrame(columns=[
+                st.session_state.phase_data[
+                        new_phase_name
+                    ] = pd.DataFrame(columns=[
 
-                    "Task_ID",
+                        "Task_ID",
 
-                    "Task_Type",
+                        "Task_Type",
 
-                    "Parent_Task",
+                        "Parent_Task",
 
-                    "Task",
+                        "Task",
 
-                    "Status",
+                        "Status",
 
-                    "Priority",
+                        "Priority",
 
-                    "Assignee",
+                        "Assignee",
 
-                    "Planned Start Date",
+                        "Planned Start Date",
 
-                    "Planned End Date",
+                        "Planned End Date",
 
-                    "Actual End Date",
+                        "Actual End Date",
 
-                    "Progress"
+                        "Progress"
 
-                ])
+                    ])
 
-            save_excel()
+                save_excel()
 
-            st.rerun()
+                st.rerun()
 
 # =========================================================
 # HEADER
@@ -559,29 +637,33 @@ for phase_name in list(
 
     with c2:
 
-        if st.button(
-            "✏️",
-            key=f"edit_btn_{phase_name}"
-        ):
+         if st.session_state.is_admin:
 
-            st.session_state[edit_key] = not st.session_state[
-                edit_key
-            ]
+            if st.button(
+                "✏️",
+                key=f"edit_btn_{phase_name}"
+            ):
+
+                st.session_state[edit_key] = not st.session_state[
+                    edit_key
+                ]
 
     with c3:
 
-        if st.button(
-            "🗑",
-            key=f"delete_phase_{phase_name}"
-        ):
+        if st.session_state.is_admin:
 
-            del st.session_state.phase_data[
-                phase_name
-            ]
+            if st.button(
+                "🗑",
+                key=f"delete_phase_{phase_name}"
+            ):
 
-            save_excel()
+                del st.session_state.phase_data[
+                    phase_name
+                ]
 
-            st.rerun()
+                save_excel()
+
+                st.rerun()
 
         # =====================================================
     # TABLE VIEW
@@ -664,6 +746,33 @@ for phase_name in list(
                     == main_row["Task"],
                     "Progress"
                 ] = avg_sub_progress
+                # ==========================================
+                # AUTO MAIN TASK STATUS
+                # ==========================================
+
+                all_subtasks_done = (
+                    sub_df_calc["Status"]
+                    .astype(str)
+                    .str.strip()
+                    .eq("Done")
+                    .all()
+                )
+
+                if all_subtasks_done:
+
+                    main_status = "Done"
+
+                else:
+
+                    main_status = "Pending"
+
+                phase_df.loc[
+                    phase_df["Task"]
+                    == main_row["Task"],
+                    "Status"
+                ] = main_status
+
+                main_row["Status"] = main_status
 
                 main_row["Progress"] = avg_sub_progress
 
@@ -1074,7 +1183,10 @@ for phase_name in list(
     # EDIT PANEL
     # =====================================================
 
-    if st.session_state[edit_key]:
+    if (
+        st.session_state.is_admin
+        and st.session_state[edit_key]
+    ):
 
         st.markdown(
             '<div class="form-box">',
@@ -1136,7 +1248,8 @@ for phase_name in list(
                     "Task_Type",
                     "Main Task"
                 )
-            )
+            ),
+            key=f"task_type_{phase_name}"
         )
 
         parent_task = ""
@@ -1164,18 +1277,31 @@ for phase_name in list(
                 st.warning(
                     "Create a Main Task first."
                 )
+        if selected_task == "New Task":
 
+            selected_row = {
+                "Task": "",
+                "Task_Type": "Main Task",
+                "Status": "Pending",
+                "Priority": "Medium",
+                "Assignee": "",
+                "Progress": 0
+            }    
+    
+    
+   
         # =================================================
         # TASK DETAILS
         # =================================================
 
         task_name = st.text_input(
-            "Task Name",
-            value=selected_row.get(
-                "Task",
-                ""
-            )
-        )
+        "Task Name",
+        value=selected_row.get(
+            "Task",
+            ""
+        ),
+        key=f"task_name_{phase_name}"
+    )
 
         x1, x2, x3 = st.columns(3)
 
@@ -1199,7 +1325,8 @@ for phase_name in list(
                         "Status",
                         "Pending"
                     )
-                )
+                ),
+                key=f"status_{phase_name}"
             )
 
         with x2:
@@ -1220,7 +1347,8 @@ for phase_name in list(
                         "Priority",
                         "Medium"
                     )
-                )
+                ),
+                key=f"priority_{phase_name}"
             )
 
         with x3:
@@ -1230,7 +1358,8 @@ for phase_name in list(
                 value=selected_row.get(
                     "Assignee",
                     ""
-                )
+                ),
+                key=f"assignee_{phase_name}"
             )
 
         y1, y2 = st.columns(2)
@@ -1244,7 +1373,8 @@ for phase_name in list(
                         "Planned Start Date",
                         str(date.today())
                     )
-                )
+                ),
+                    key=f"planned_start_{phase_name}"
             )
 
         with y2:
@@ -1256,15 +1386,17 @@ for phase_name in list(
                         "Planned End Date",
                         str(date.today())
                     )
-                )
+                ),
+                key=f"planned_end_{phase_name}"
             )
 
-       
-        # =====================================================
-        # ACTUAL END DATE
-        # =====================================================
+        
+            # =====================================================
+            # ACTUAL END DATE
+            # =====================================================
 
         actual_end = ""
+        
 
         if task_type == "Sub Task":
 
@@ -1277,7 +1409,8 @@ for phase_name in list(
 
                 actual_end = st.date_input(
                     "Actual End Date",
-                    value=date.today()
+                    value=date.today(),
+                    key=f"actual_end_{phase_name}"
                 )
 
         else:
@@ -1300,8 +1433,10 @@ for phase_name in list(
 
         task_position = st.selectbox(
             "Task Position",
-            position_options
+            position_options,
+            key=f"task_position_{phase_name}"
         )
+        
 
         # ==========================================
         # PROGRESS
@@ -1317,7 +1452,8 @@ for phase_name in list(
                 "Progress",
                 0,
                 100,
-                int(selected_row.get("Progress", 0))
+                int(selected_row.get("Progress", 0)),
+            
             )
 
         else:
@@ -1328,172 +1464,175 @@ for phase_name in list(
         # =================================================
         # BUTTONS
         # =================================================
+        if st.session_state.is_admin:
+        
+            b1, b2 = st.columns(2)
 
-        b1, b2 = st.columns(2)
+            with b1:
 
-        with b1:
+                
 
-            if st.button(
-                "💾 Save Changes",
-                key=f"save_{phase_name}"
-            ):
+                    if st.button(
+                        "💾 Save Changes",
+                        key=f"save_{phase_name}"
+                    ):
 
-                if len(phase_df) == 0:
+                        if len(phase_df) == 0:
 
-                    next_task_id = 1
+                            next_task_id = 1
 
-                else:
+                        else:
 
-                    next_task_id = int(
-                        phase_df["Task_ID"].max()
-                    ) + 1
+                            next_task_id = int(
+                                phase_df["Task_ID"].max()
+                            ) + 1
 
-                new_row = {
+                        new_row = {
 
-                    "Task_ID": (
-                        selected_task_id
-                        if selected_task != "New Task"
-                        else next_task_id
-                    ),
+                            "Task_ID": (
+                                selected_task_id
+                                if selected_task != "New Task"
+                                else next_task_id
+                            ),
 
-                    "Task_Type": task_type,
+                            "Task_Type": task_type,
 
-                    "Parent_Task": parent_task,
+                            "Parent_Task": parent_task,
 
-                    "Task": task_name,
+                            "Task": task_name,
 
-                    "Status": status,
+                            "Status": status,
 
-                    "Priority": priority,
+                            "Priority": priority,
 
-                    "Assignee": assignee,
+                            "Assignee": assignee,
 
-                    "Planned Start Date": str(planned_start),
+                            "Planned Start Date": str(planned_start),
 
-                    "Planned End Date": str(planned_end),
+                            "Planned End Date": str(planned_end),
 
-                    "Actual End Date": (
-                        str(actual_end)
-                        if actual_end != ""
-                        else ""
-                    ),
+                            "Actual End Date": (
+                                str(actual_end)
+                                if actual_end != ""
+                                else ""
+                            ),
 
-                    "Progress": progress
-                }
+                            "Progress": progress
+                        }
 
-                # =========================================
-                # EDIT EXISTING
-                # =========================================
+                    # =========================================
+                    # EDIT EXISTING
+                    # =========================================
+                    
+                        if (
+                            selected_task != "New Task"
+                            and selected_task_id is not None
+                        ):
 
-                if (
-                    selected_task != "New Task"
-                    and selected_task_id is not None
+                            idx = phase_df[
+                                phase_df["Task_ID"] == selected_task_id
+                            ].index[0]
+
+                            phase_df = phase_df.drop(idx)
+
+                            phase_df = phase_df.reset_index(
+                                drop=True
+                            )
+
+                            if task_position == "Default (Last)":
+
+                                insert_pos = len(phase_df)
+
+                            else:
+
+                                insert_pos = int(
+                                    task_position
+                                ) - 1
+
+                            top = phase_df.iloc[:insert_pos]
+
+                            bottom = phase_df.iloc[insert_pos:]
+
+                            phase_df = pd.concat(
+                                [
+                                    top,
+                                    pd.DataFrame([new_row]),
+                                    bottom
+                                ],
+                                ignore_index=True
+                            )
+
+                        # =========================================
+                        # ADD NEW
+                        # =========================================
+
+                        else:
+
+                            if task_position == "Default (Last)":
+
+                                phase_df = pd.concat(
+                                    [
+                                        phase_df,
+                                        pd.DataFrame([new_row])
+                                    ],
+                                    ignore_index=True
+                                )
+
+                            else:
+
+                                insert_pos = int(
+                                    task_position
+                                ) - 1
+
+                                top = phase_df.iloc[:insert_pos]
+
+                                bottom = phase_df.iloc[insert_pos:]
+
+                                phase_df = pd.concat(
+                                    [
+                                        top,
+                                        pd.DataFrame([new_row]),
+                                        bottom
+                                    ],
+                                    ignore_index=True
+                                )
+
+                        st.session_state.phase_data[
+                            phase_name
+                        ] = phase_df
+
+                        save_excel()
+
+                        st.session_state[
+                            edit_key
+                        ] = False
+
+                        st.rerun()
+
+            with b2:
+
+                if st.button(
+                    "🗑 Delete Task",
+                    key=f"delete_task_{phase_name}"
                 ):
 
-                    idx = phase_df[
-                        phase_df["Task_ID"] == selected_task_id
-                    ].index[0]
+                    if selected_task_id is not None:
 
-                    phase_df = phase_df.drop(idx)
+                        phase_df = phase_df[
+                            phase_df["Task_ID"] != selected_task_id
+                        ]
 
-                    phase_df = phase_df.reset_index(
-                        drop=True
-                    )
+                        st.session_state.phase_data[
+                            phase_name
+                        ] = phase_df
 
-                    if task_position == "Default (Last)":
+                        save_excel()
 
-                        insert_pos = len(phase_df)
+                        st.session_state[
+                            edit_key
+                        ] = False
 
-                    else:
-
-                        insert_pos = int(
-                            task_position
-                        ) - 1
-
-                    top = phase_df.iloc[:insert_pos]
-
-                    bottom = phase_df.iloc[insert_pos:]
-
-                    phase_df = pd.concat(
-                        [
-                            top,
-                            pd.DataFrame([new_row]),
-                            bottom
-                        ],
-                        ignore_index=True
-                    )
-
-                # =========================================
-                # ADD NEW
-                # =========================================
-
-                else:
-
-                    if task_position == "Default (Last)":
-
-                        phase_df = pd.concat(
-                            [
-                                phase_df,
-                                pd.DataFrame([new_row])
-                            ],
-                            ignore_index=True
-                        )
-
-                    else:
-
-                        insert_pos = int(
-                            task_position
-                        ) - 1
-
-                        top = phase_df.iloc[:insert_pos]
-
-                        bottom = phase_df.iloc[insert_pos:]
-
-                        phase_df = pd.concat(
-                            [
-                                top,
-                                pd.DataFrame([new_row]),
-                                bottom
-                            ],
-                            ignore_index=True
-                        )
-
-                st.session_state.phase_data[
-                    phase_name
-                ] = phase_df
-
-                save_excel()
-
-                st.session_state[
-                    edit_key
-                ] = False
-
-                st.rerun()
-
-        with b2:
-
-            if st.button(
-                "🗑 Delete Task",
-                key=f"delete_task_{phase_name}"
-            ):
-
-                if selected_task_id is not None:
-
-                    phase_df = phase_df[
-                        phase_df["Task_ID"] != selected_task_id
-                    ]
-
-                    st.session_state.phase_data[
-                        phase_name
-                    ] = phase_df
-
-                    save_excel()
-
-                    st.session_state[
-                        edit_key
-                    ] = False
-
-                    st.rerun()
+                        st.rerun()
 
         st.markdown(
             "</div>",
