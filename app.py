@@ -18,7 +18,10 @@ st.set_page_config(
 # ADMIN SECURITY
 # =====================================================
 
-ADMIN_PASSWORD = st.secrets["ADMIN_PASSWORD"]
+ADMIN_PASSWORD = st.secrets.get(
+    "ADMIN_PASSWORD",
+    "admin123"
+)
 
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
