@@ -4,7 +4,85 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date
 import os
+import shutil 
+import gspread
+from google.oauth2.service_account import Credentials
+PROJECT_FILE = "project_name.txt"
+EXCEL_FILE = "project_tracker.xlsx"
+BACKUP_FILE = "backup.xlsx"
+GOOGLE_SHEET_NAME = "PMO Dashboard Data" 
 
+def create_backup():
+
+    if os.path.exists(EXCEL_FILE):
+
+        shutil.copy2(
+            EXCEL_FILE,
+            BACKUP_FILE
+        )
+def restore_backup():
+
+    if os.path.exists(BACKUP_FILE):
+
+        shutil.copy2(
+            BACKUP_FILE,
+            EXCEL_FILE
+        )
+
+        if "phase_data" in st.session_state:
+            del st.session_state.phase_data
+
+        st.session_state.confirm_restore = False
+        st.session_state.restore_success = True
+
+        st.rerun()
+
+def connect_google_sheet():
+
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    creds = Credentials.from_service_account_file(
+        "credentials.json",
+        scopes=scopes
+    )
+
+    client = gspread.authorize(creds)
+
+    return client.open(
+        GOOGLE_SHEET_NAME
+    )
+
+def backup_to_google_sheet():
+
+    sheet = connect_google_sheet()
+
+    # Delete all existing worksheets
+
+    existing_sheets = sheet.worksheets()
+
+    for ws in existing_sheets[1:]:
+
+        sheet.del_worksheet(ws)
+    first_sheet = sheet.get_worksheet(0)
+
+    first_sheet.clear()
+
+    # Create fresh worksheets
+
+    for phase_name, df in st.session_state.phase_data.items():
+
+        ws = sheet.add_worksheet(
+            title=phase_name[:100],
+            rows=max(len(df) + 10, 100),
+            cols=max(len(df.columns) + 5, 20)
+        )
+
+        data = [df.columns.tolist()] + df.fillna("").values.tolist()
+
+        ws.update(data)
 # =========================================================
 # PAGE CONFIG
 # =========================================================
@@ -27,7 +105,10 @@ if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 if "show_login" not in st.session_state:
     st.session_state.show_login = False
-
+if "confirm_restore" not in st.session_state:
+    st.session_state.confirm_restore = False
+if "restore_success" not in st.session_state:
+    st.session_state.restore_success = False
 with st.sidebar:
 
     st.markdown("---")
@@ -90,14 +171,72 @@ with st.sidebar:
             
 
             st.rerun()
+        st.markdown("---")
+
+        if st.button(
+            "📦 Create Backup",
+            use_container_width=True
+        ):
+
+            try:
+
+                create_backup()
+
+                backup_to_google_sheet()
+
+                st.success(
+                    "Backup Saved to Local & Google Sheet"
+                )
+
+            except Exception as e:
+
+                st.error(str(e))
+
+
+
+        if st.button(
+            "♻ Restore Backup",
+            use_container_width=True
+        ):
+
+            st.session_state.confirm_restore = True
+        if st.session_state.confirm_restore:
+
+            st.warning(
+                "This will replace current data with backup data."
+            )
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+
+                if st.button(
+                    "✅ Yes Restore",
+                    use_container_width=True
+                ):
+
+                    restore_backup()
+
+            with c2:
+
+                if st.button(
+                    "❌ Cancel",
+                    use_container_width=True
+                ):
+
+                    st.session_state.confirm_restore = False
+                    
+                    st.rerun()
+
+        if st.session_state.restore_success:
+
+            st.success(
+                "Restore Successful"
+            )
+
+            st.session_state.restore_success = False
 
     st.markdown("---")
-# =========================================================
-# FILES
-# =========================================================
-
-PROJECT_FILE = "project_name.txt"
-EXCEL_FILE = "project_tracker.xlsx"
 
 # =========================================================
 # CSS
