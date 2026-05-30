@@ -1,1 +1,5 @@
 .streamlit/secrets.toml
+credentials.json
+backup.xlsx
+project_tracker.xlsx
+__pycache__/
