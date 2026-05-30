@@ -1391,7 +1391,7 @@ for phase_name in list(
                     "Main Task"
                 )
             ),
-            key=f"task_type_{phase_name}"
+            key=f"task_type_{phase_name}_{selected_task}"
         )
 
         parent_task = ""
@@ -1410,9 +1410,22 @@ for phase_name in list(
             if len(main_task_list) > 0:
 
                 parent_task = st.selectbox(
-                    "Parent Main Task",
-                    main_task_list
-                )
+                        "Parent Main Task",
+                        main_task_list,
+                        index=(
+                            main_task_list.index(
+                                selected_row.get(
+                                    "Parent_Task",
+                                    main_task_list[0]
+                                )
+                            )
+                            if selected_row.get(
+                                "Parent_Task",
+                                ""
+                            ) in main_task_list
+                            else 0
+                        )
+                    )
 
             else:
 
@@ -1442,7 +1455,7 @@ for phase_name in list(
             "Task",
             ""
         ),
-        key=f"task_name_{phase_name}"
+        key=f"task_name_{phase_name}_{selected_task}"
     )
 
         x1, x2, x3 = st.columns(3)
@@ -1468,7 +1481,7 @@ for phase_name in list(
                         "Pending"
                     )
                 ),
-                key=f"status_{phase_name}"
+                key=f"status_{phase_name}_{selected_task}"
             )
 
         with x2:
@@ -1490,7 +1503,7 @@ for phase_name in list(
                         "Medium"
                     )
                 ),
-                key=f"priority_{phase_name}"
+                key=f"priority_{phase_name}_{selected_task}"
             )
 
         with x3:
@@ -1501,7 +1514,7 @@ for phase_name in list(
                     "Assignee",
                     ""
                 ),
-                key=f"assignee_{phase_name}"
+                key=f"assignee_{phase_name}_{selected_task}"
             )
 
         y1, y2 = st.columns(2)
@@ -1516,7 +1529,7 @@ for phase_name in list(
                         str(date.today())
                     )
                 ),
-                    key=f"planned_start_{phase_name}"
+                    key=f"planned_start_{phase_name}_{selected_task}"
             )
 
         with y2:
@@ -1529,7 +1542,7 @@ for phase_name in list(
                         str(date.today())
                     )
                 ),
-                key=f"planned_end_{phase_name}"
+                key=f"planned_end_{phase_name}_{selected_task}"
             )
 
         
@@ -1538,21 +1551,35 @@ for phase_name in list(
             # =====================================================
 
         actual_end = ""
-        
 
         if task_type == "Sub Task":
 
+            existing_actual = str(
+                selected_row.get(
+                    "Actual End Date",
+                    ""
+                )
+            ).strip()
+
             has_actual = st.checkbox(
                 "Has Actual End Date?",
-                value=False
+                value=(
+                    existing_actual != ""
+                    and existing_actual.lower() != "nan"
+                )
             )
 
             if has_actual:
 
                 actual_end = st.date_input(
                     "Actual End Date",
-                    value=date.today(),
-                    key=f"actual_end_{phase_name}"
+                    value=(
+                        pd.to_datetime(existing_actual)
+                        if existing_actual != ""
+                        and existing_actual.lower() != "nan"
+                        else date.today()
+                    ),
+                    key=f"actual_end_{phase_name}_{selected_task}"
                 )
 
         else:
