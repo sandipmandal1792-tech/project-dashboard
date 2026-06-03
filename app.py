@@ -1086,7 +1086,7 @@ for phase_name in list(
                 color:white;
                 text-align:center;
                 ">
-                {main_row['Assignee']}
+                {'' if pd.isna(main_row['Assignee']) else main_row['Assignee']}
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1105,7 +1105,7 @@ for phase_name in list(
                 color:white;
                 text-align:center;
                 ">
-                {main_row['Planned Start Date']}
+                {pd.to_datetime(main_row['Planned Start Date']).strftime('%Y-%m-%d')}
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1124,7 +1124,7 @@ for phase_name in list(
                 color:white;
                 text-align:center;
                 ">
-                {main_row['Planned End Date']}
+                {pd.to_datetime(main_row['Planned End Date']).strftime('%Y-%m-%d')}
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1139,7 +1139,7 @@ for phase_name in list(
                 color:white;
                 text-align:center;
                 ">
-                {main_row['Actual End Date']}
+                {'' if pd.isna(main_row['Actual End Date']) else pd.to_datetime(main_row['Actual End Date']).strftime('%Y-%m-%d')} 
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -1247,7 +1247,7 @@ for phase_name in list(
                         color:#bfdbfe;
                         text-align:center;
                         ">
-                        {sub_row['Assignee']}
+                        {'' if pd.isna(sub_row['Assignee']) else sub_row['Assignee']}
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1264,7 +1264,7 @@ for phase_name in list(
                         color:#bfdbfe;
                         text-align:center;
                         ">
-                        {sub_row['Planned Start Date']}
+                        {pd.to_datetime(sub_row['Planned Start Date']).strftime('%Y-%m-%d')}
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1281,7 +1281,7 @@ for phase_name in list(
                         color:#bfdbfe;
                         text-align:center;
                         ">
-                        {sub_row['Planned End Date']}
+                        {pd.to_datetime(sub_row['Planned End Date']).strftime('%Y-%m-%d')}
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1298,7 +1298,7 @@ for phase_name in list(
                         color:#bfdbfe;
                         text-align:center;
                         ">
-                            {sub_row.get('Actual End Date', '')}
+                            {'' if pd.isna(sub_row.get('Actual End Date', '')) else pd.to_datetime(sub_row.get('Actual End Date', '')).strftime('%Y-%m-%d')}
                         </div>
                         """,
                         unsafe_allow_html=True
