@@ -87,7 +87,12 @@ def backup_to_google_sheet():
             cols=max(len(df.columns) + 5, 20)
         )
 
-        data = [df.columns.tolist()] + df.fillna("").values.tolist()
+        safe_df = df.copy()
+
+        for col in safe_df.columns:
+            safe_df[col] = safe_df[col].astype(str)
+
+        data = [safe_df.columns.tolist()] + safe_df.values.tolist()
 
         ws.update(data)
 # =========================================================
