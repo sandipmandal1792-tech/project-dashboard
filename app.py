@@ -1,4 +1,4 @@
-
+import traceback
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -7,6 +7,8 @@ import os
 import shutil 
 import gspread
 from google.oauth2.service_account import Credentials
+
+
 PROJECT_FILE = "project_name.txt"
 EXCEL_FILE = "project_tracker.xlsx"
 BACKUP_FILE = "backup.xlsx"
@@ -204,6 +206,7 @@ with st.sidebar:
             except Exception as e:
 
                 st.error(str(e))
+                st.code(traceback.format_exc())
 
 
 
