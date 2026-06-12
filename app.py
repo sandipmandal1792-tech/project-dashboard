@@ -91,11 +91,19 @@ def backup_to_google_sheet():
 
         safe_df = df.copy()
 
-        safe_df = safe_df.fillna("")
+        safe_df = safe_df.where(pd.notnull(safe_df), "")
 
         safe_df = safe_df.astype(str)
 
         data = [safe_df.columns.tolist()] + safe_df.values.tolist()
+
+        # DEBUG
+        for r, row in enumerate(data):
+            for c, value in enumerate(row):
+                if str(value).lower() == "nan":
+                    st.error(
+                        f"Found NaN in Sheet={phase_name}, Row={r}, Col={c}, Value={value}"
+                    )
 
         ws.update(data)
 # =========================================================
