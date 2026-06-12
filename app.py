@@ -69,10 +69,17 @@ def backup_to_google_sheet():
     first_sheet = sheet.get_worksheet(0)
 
     first_sheet.clear()
+    first_sheet.update_title("TEMP_BACKUP")
 
     # Create fresh worksheets
 
     for phase_name, df in st.session_state.phase_data.items():
+
+        try:
+            old_ws = sheet.worksheet(phase_name[:100])
+            sheet.del_worksheet(old_ws)
+        except:
+            pass
 
         ws = sheet.add_worksheet(
             title=phase_name[:100],
@@ -1564,19 +1571,27 @@ for phase_name in list(
             has_actual = st.checkbox(
                 "Has Actual End Date?",
                 value=(
-                    existing_actual != ""
-                    and existing_actual.lower() != "nan"
+                    existing_actual not in [
+                        "",
+                        "nan",
+                        "NaT",
+                        "None"
+                    ]
                 )
             )
 
             if has_actual:
 
+                parsed_date = pd.to_datetime(
+                    existing_actual,
+                    errors="coerce"
+                )
+
                 actual_end = st.date_input(
                     "Actual End Date",
                     value=(
-                        pd.to_datetime(existing_actual)
-                        if existing_actual != ""
-                        and existing_actual.lower() != "nan"
+                        parsed_date.date()
+                        if pd.notna(parsed_date)
                         else date.today()
                     ),
                     key=f"actual_end_{phase_name}_{selected_task}"
