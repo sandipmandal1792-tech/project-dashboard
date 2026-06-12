@@ -1336,7 +1336,19 @@ for phase_name in list(
                         color:#bfdbfe;
                         text-align:center;
                         ">
-                            {'' if pd.isna(sub_row.get('Actual End Date', '')) else pd.to_datetime(sub_row.get('Actual End Date', '')).strftime('%Y-%m-%d')}
+                            {
+                            ""
+                            if pd.isna(
+                                pd.to_datetime(
+                                    sub_row.get("Actual End Date", ""),
+                                    errors="coerce"
+                                )
+                            )
+                            else pd.to_datetime(
+                                sub_row.get("Actual End Date", ""),
+                                errors="coerce"
+                            ).strftime("%Y-%m-%d")
+                        }
                         </div>
                         """,
                         unsafe_allow_html=True
